@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "f1-ga-optimizer"
 version = "0.1.0"
@@ -7,3 +11,11 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.13.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/f1_optimizer"]
