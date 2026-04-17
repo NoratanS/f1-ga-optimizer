@@ -45,3 +45,24 @@ class TrackSchema(BaseModel):
             raise ValueError(
                 f"Temperatures must be a JSON string or list, got {type(value).__name__}."
             )
+
+    @field_validator('temperatures', mode='after')
+    @classmethod
+    def validate_temperature_count(cls, value: list[float]) -> list[float]:
+        """Validate that exactly 40 temperature values are provided (one per week).
+
+        Args:
+            value: The list of temperature values.
+
+        Returns:
+            The validated list.
+
+        Raises:
+            ValueError: If the list does not contain exactly 40 values.
+        """
+        if len(value) != 40:
+            raise ValueError(
+                f"Expected 40 temperature values (one per week of the season), "
+                f"got {len(value)}."
+            )
+        return value

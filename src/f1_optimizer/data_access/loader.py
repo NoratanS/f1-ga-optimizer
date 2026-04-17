@@ -18,33 +18,16 @@ class CsvTrackLoaderError(Exception):
 
 
 class CsvTrackLoader:
-    """Loads and validates F1 track data from CSV files.
-
-    This loader reads track data from a CSV file and validates each record
-    using the TrackSchema. It returns a track database (dictionary) mapping
-    track IDs to validated TrackSchema instances, which can be used for
-    distance matrix calculations and fitness function evaluation in the
-    genetic algorithm.
-
-    Attributes:
-        file_path: Path to the CSV file containing track data.
-
-    Example:
-        >>> loader = CsvTrackLoader('data/data.csv')
-        >>> track_db = loader.load()
-        >>> melbourne_track = track_db[1]
-        >>> print(melbourne_track.city)
-        Melbourne
-    """
+    """Loads and validates F1 track data from CSV files with all-or-nothing validation."""
 
     def __init__(self, file_path: str | Path) -> None:
-        """Initialize the loader with a path to the CSV file.
-
+        """Initialize with CSV file path.
+        
         Args:
-            file_path: Path to the CSV file (string or Path object).
-
+            file_path: Path to CSV file (string or Path).
+            
         Raises:
-            CsvTrackLoaderError: If the file path is invalid or file doesn't exist.
+            CsvTrackLoaderError: If file doesn't exist, is not a file, or isn't CSV.
         """
         self.file_path = Path(file_path)
 
@@ -62,26 +45,17 @@ class CsvTrackLoader:
             )
 
     def load(self) -> dict[int, TrackSchema]:
-        """Load and validate track data from the CSV file.
-
-        Reads the CSV file, validates each row against TrackSchema, and returns
-        a dictionary mapping track IDs to TrackSchema instances.
-
+        """Load and validate all tracks from CSV.
+        
         Returns:
-            A dictionary mapping track ID (int) to TrackSchema instance.
-            Example: {1: TrackSchema(...), 2: TrackSchema(...), ...}
-
+            dict[int, TrackSchema]: Tracks keyed by ID.
+            
         Raises:
-            CsvTrackLoaderError: If the file cannot be read or contains invalid data.
-
-        Example:
-            >>> loader = CsvTrackLoader('data/data.csv')
-            >>> tracks = loader.load()
-            >>> print(f"Loaded {len(tracks)} tracks")
-            Loaded 24 tracks
+            CsvTrackLoaderError: If any validation, duplicate ID, or file read error occurs.
         """
         track_db: dict[int, TrackSchema] = {}
         invalid_rows: list[tuple[int, str]] = []
+        duplicate_ids: list[int] = []
 
         try:
             with self.file_path.open('r', encoding='utf-8') as csvfile:
@@ -90,36 +64,65 @@ class CsvTrackLoader:
                 if reader.fieldnames is None:
                     raise CsvTrackLoaderError("CSV file is empty or has no headers")
 
-                for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
-                    try:
-                        track = TrackSchema(**row)
-                        track_db[track.id] = track
-                        logger.debug(
-                            f"Loaded track {track.id}: {track.city} ({track.country})"
-                        )
-                    except ValidationError as e:
-                        error_msg = f"Row {row_num}: {e.error_count()} validation error(s)"
-                        invalid_rows.append((row_num, error_msg))
-                        logger.warning(f"Skipped {error_msg}")
+                for row_num, row in enumerate(reader, start=2):
+                    self._validate_and_add_track(
+                        row_num, row, track_db, invalid_rows, duplicate_ids
+                    )
 
         except FileNotFoundError as e:
             raise CsvTrackLoaderError(f"Could not open file: {self.file_path}") from e
         except (csv.Error, UnicodeDecodeError) as e:
             raise CsvTrackLoaderError(f"Error reading CSV file: {e}") from e
 
-        if not track_db:
+        # Fail if any data quality issues found
+        if duplicate_ids:
             raise CsvTrackLoaderError(
-                "No valid tracks loaded from CSV. "
-                f"{len(invalid_rows)} rows failed validation."
+                f"Found {len(duplicate_ids)} duplicate track ID(s): {duplicate_ids}. "
+                "Please fix the data source."
             )
 
         if invalid_rows:
-            logger.warning(
-                f"Loaded {len(track_db)} tracks with {len(invalid_rows)} invalid rows"
+            raise CsvTrackLoaderError(
+                f"Found {len(invalid_rows)} invalid row(s) in CSV. "
+                "Please fix the data source."
             )
+
+        if not track_db:
+            raise CsvTrackLoaderError("No valid tracks loaded from CSV.")
 
         logger.info(
             f"Successfully loaded {len(track_db)} tracks from {self.file_path.name}"
         )
         return track_db
+
+    def _validate_and_add_track(
+        self,
+        row_num: int,
+        row: dict,
+        track_db: dict[int, TrackSchema],
+        invalid_rows: list[tuple[int, str]],
+        duplicate_ids: list[int],
+    ) -> None:
+        """Validate and add a single track row, handling errors and duplicates."""
+        try:
+            track = TrackSchema(**row)
+
+            if track.id in track_db:
+                existing = track_db[track.id]
+                if track.id not in duplicate_ids:
+                    duplicate_ids.append(track.id)
+                logger.error(
+                    f"Row {row_num}: Duplicate ID {track.id} "
+                    f"({existing.city} vs {track.city})"
+                )
+            else:
+                track_db[track.id] = track
+                logger.debug(f"Loaded {track.id}: {track.city} ({track.country})")
+
+        except ValidationError as e:
+            error_summary = "; ".join(
+                f"{err['loc'][0]}: {err['msg']}" for err in e.errors()
+            )
+            invalid_rows.append((row_num, error_summary))
+            logger.error(f"Row {row_num}: {error_summary}")
 
