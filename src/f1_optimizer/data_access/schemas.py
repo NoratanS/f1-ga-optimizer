@@ -32,13 +32,30 @@ class TrackSchema(BaseModel):
             ValueError: If the value cannot be parsed as temperatures.
         """
         if isinstance(value, str):
+            # Prevent denial-of-service attacks with excessively large input
+            max_size = 1024  # 1 KB limit for JSON temperature string
+            if len(value) > max_size:
+                raise ValueError(
+                    f"Temperature JSON string exceeds maximum size ({max_size} bytes)."
+                )
+            
             try:
                 parsed = json.loads(value)
-                if not isinstance(parsed, list):
-                    raise ValueError("JSON must contain a list.")
-                return parsed
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON in Temperatures field: {e}") from e
+            
+            if not isinstance(parsed, list):
+                raise ValueError("Temperature JSON must contain a list.")
+            
+            # Verify all elements are numeric before returning
+            for i, temp in enumerate(parsed):
+                if not isinstance(temp, (int, float)) or isinstance(temp, bool):
+                    raise ValueError(
+                        f"Temperature at index {i} must be numeric, got {type(temp).__name__} "
+                        f"(value: {temp!r})."
+                    )
+            
+            return parsed
         elif isinstance(value, list):
             return value
         else:

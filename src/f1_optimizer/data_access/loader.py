@@ -1,5 +1,3 @@
-"""Data loading and validation for F1 track information."""
-
 import csv
 import logging
 from pathlib import Path
@@ -82,9 +80,11 @@ class CsvTrackLoader:
             )
 
         if invalid_rows:
+            error_details = "\n".join(
+                f"  Row {row_num}: {error_msg}" for row_num, error_msg in invalid_rows
+            )
             raise CsvTrackLoaderError(
-                f"Found {len(invalid_rows)} invalid row(s) in CSV. "
-                "Please fix the data source."
+                f"Found {len(invalid_rows)} invalid row(s) in CSV:\n{error_details}"
             )
 
         if not track_db:

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -163,6 +165,88 @@ class TestTrackSchemaTemperatureValidation:
         # Assert
         assert any(t < 0 for t in track.temperatures)
         assert len(track.temperatures) == 40
+
+    def test_rejects_oversized_json_string(self) -> None:
+        """TrackSchema should reject JSON strings exceeding 1 KB."""
+        # Arrange
+        # Create a JSON string larger than 1024 bytes
+        oversized_json = '[' + ', '.join(['1.0'] * 500) + ']'  # > 1 KB
+        data = {
+            'ID': 1,
+            'City': 'Test',
+            'Country': 'Country',
+            'Track_Name': 'Track',
+            'Region': 'Region',
+            'Latitude': 0.0,
+            'Longitude': 0.0,
+            'UTC_Offset': 0,
+            'Temperatures': oversized_json,
+        }
+        
+        # Act & Assert
+        with pytest.raises(ValidationError, match="maximum size"):
+            TrackSchema(**data)
+
+    def test_rejects_json_with_non_numeric_values(self) -> None:
+        """TrackSchema should reject JSON array with non-numeric values."""
+        # Arrange
+        temps = list(range(1, 39)) + ['not_a_number', 40.0]
+        json_str = json.dumps(temps)
+        data = {
+            'ID': 1,
+            'City': 'Test',
+            'Country': 'Country',
+            'Track_Name': 'Track',
+            'Region': 'Region',
+            'Latitude': 0.0,
+            'Longitude': 0.0,
+            'UTC_Offset': 0,
+            'Temperatures': json_str,
+        }
+        
+        # Act & Assert
+        with pytest.raises(ValidationError, match="must be numeric"):
+            TrackSchema(**data)
+
+    def test_rejects_invalid_json_format(self) -> None:
+        """TrackSchema should reject malformed JSON."""
+        # Arrange
+        invalid_json = '[1.0, 2.0, 3.0'  # Missing closing bracket
+        data = {
+            'ID': 1,
+            'City': 'Test',
+            'Country': 'Country',
+            'Track_Name': 'Track',
+            'Region': 'Region',
+            'Latitude': 0.0,
+            'Longitude': 0.0,
+            'UTC_Offset': 0,
+            'Temperatures': invalid_json,
+        }
+        
+        # Act & Assert
+        with pytest.raises(ValidationError, match="Invalid JSON"):
+            TrackSchema(**data)
+
+    def test_rejects_json_object_instead_of_list(self) -> None:
+        """TrackSchema should reject JSON object instead of list."""
+        # Arrange
+        json_object = '{"temperatures": [1.0, 2.0, 3.0]}'
+        data = {
+            'ID': 1,
+            'City': 'Test',
+            'Country': 'Country',
+            'Track_Name': 'Track',
+            'Region': 'Region',
+            'Latitude': 0.0,
+            'Longitude': 0.0,
+            'UTC_Offset': 0,
+            'Temperatures': json_object,
+        }
+        
+        # Act & Assert
+        with pytest.raises(ValidationError, match="must contain a list"):
+            TrackSchema(**data)
 
 
 class TestTrackSchemaFieldValidation:
