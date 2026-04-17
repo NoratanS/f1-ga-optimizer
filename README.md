@@ -39,7 +39,7 @@ This project uses `uv` for lightning-fast, reproducible environments. You don't 
 
 ## 📈 Development Roadmap
 - [x] Epic 1: Domain Models (Genotype) & Core Architecture
-- [ ] Epic 2: Data Access & Pydantic Validation (CSV Loading)
+- [x] Epic 2: Data Access & Pydantic Validation (CSV Loading)
 - [ ] Epic 3: GA Operators (Fitness, Crossover, Mutation)
 - [ ] Epic 4: Evolutionary Loop & CLI Integration
 - [ ] Epic 5: Visualization
