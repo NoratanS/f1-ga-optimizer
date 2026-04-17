@@ -1,9 +1,13 @@
 import json
+from typing import ClassVar
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class TrackSchema(BaseModel):
     """Validation schema (Data Transfer Object) for an F1 track."""
+
+    SEASON_WEEKS: ClassVar[int] = 40  # Number of weeks in the F1 season
 
     id: int = Field(alias='ID')
     city: str = Field(alias='City')
@@ -14,7 +18,7 @@ class TrackSchema(BaseModel):
     longitude: float = Field(alias='Longitude')
     utc_offset: int = Field(alias='UTC_Offset')
 
-    # Temperature list for each week of the season (40 weeks)
+    # Temperature list for each week of the season
     temperatures: list[float] = Field(alias='Temperatures')
 
     @field_validator('temperatures', mode='before')
@@ -68,7 +72,7 @@ class TrackSchema(BaseModel):
     @field_validator('temperatures', mode='after')
     @classmethod
     def validate_temperature_count(cls, value: list[float]) -> list[float]:
-        """Validate that exactly 40 temperature values are provided (one per week).
+        """Validate that exactly SEASON_WEEKS temperature values are provided.
 
         Args:
             value: The list of temperature values.
@@ -77,11 +81,11 @@ class TrackSchema(BaseModel):
             The validated list.
 
         Raises:
-            ValueError: If the list does not contain exactly 40 values.
+            ValueError: If the list does not contain exactly SEASON_WEEKS values.
         """
-        if len(value) != 40:
+        if len(value) != cls.SEASON_WEEKS:
             raise ValueError(
-                f"Expected 40 temperature values (one per week of the season), "
-                f"got {len(value)}."
+                f"Expected {cls.SEASON_WEEKS} temperature values "
+                f"(one per week of the season), got {len(value)}."
             )
         return value

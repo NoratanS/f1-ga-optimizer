@@ -12,7 +12,7 @@ class TestTrackSchemaInitialization:
     def test_init_with_json_temperatures(self) -> None:
         """TrackSchema should parse JSON temperature string."""
         # Arrange
-        temps = list(range(1, 41))
+        temps = list(range(1, TrackSchema.SEASON_WEEKS + 1))
         data = {
             'ID': 1,
             'City': 'Melbourne',
@@ -31,12 +31,12 @@ class TestTrackSchemaInitialization:
         # Assert
         assert track.id == 1
         assert track.city == 'Melbourne'
-        assert len(track.temperatures) == 40
+        assert len(track.temperatures) == TrackSchema.SEASON_WEEKS
 
     def test_init_with_list_temperatures(self) -> None:
         """TrackSchema should accept list of floats."""
         # Arrange
-        temps = list(range(1, 41))
+        temps = list(range(1, TrackSchema.SEASON_WEEKS + 1))
         data = {
             'ID': 2,
             'City': 'Shanghai',
@@ -55,12 +55,12 @@ class TestTrackSchemaInitialization:
         # Assert
         assert track.id == 2
         assert track.country == 'China'
-        assert len(track.temperatures) == 40
+        assert len(track.temperatures) == TrackSchema.SEASON_WEEKS
 
     def test_field_aliases_work(self) -> None:
         """TrackSchema should map CSV column names to Python attributes."""
         # Arrange
-        temps = list(range(1, 41))
+        temps = list(range(1, TrackSchema.SEASON_WEEKS + 1))
         data = {
             'ID': 10,
             'City': 'Silverstone',
@@ -87,7 +87,7 @@ class TestTrackSchemaTemperatureValidation:
     """Tests for temperature field constraints."""
 
     def test_rejects_too_few_temperatures(self) -> None:
-        """TrackSchema should reject fewer than 40 temperatures."""
+        """TrackSchema should reject fewer than SEASON_WEEKS temperatures."""
         # Arrange
         data = {
             'ID': 1,
@@ -98,15 +98,15 @@ class TestTrackSchemaTemperatureValidation:
             'Latitude': 0.0,
             'Longitude': 0.0,
             'UTC_Offset': 0,
-            'Temperatures': list(range(1, 30)),  # Only 29
+            'Temperatures': list(range(1, TrackSchema.SEASON_WEEKS - 10)),  # 10 fewer
         }
         
         # Act & Assert
-        with pytest.raises(ValidationError, match="40"):
+        with pytest.raises(ValidationError, match=str(TrackSchema.SEASON_WEEKS)):
             TrackSchema(**data)
 
     def test_rejects_too_many_temperatures(self) -> None:
-        """TrackSchema should reject more than 40 temperatures."""
+        """TrackSchema should reject more than SEASON_WEEKS temperatures."""
         # Arrange
         data = {
             'ID': 1,
@@ -117,11 +117,11 @@ class TestTrackSchemaTemperatureValidation:
             'Latitude': 0.0,
             'Longitude': 0.0,
             'UTC_Offset': 0,
-            'Temperatures': list(range(1, 50)),  # 49 values
+            'Temperatures': list(range(1, TrackSchema.SEASON_WEEKS + 10)),  # 10 more
         }
         
         # Act & Assert
-        with pytest.raises(ValidationError, match="40"):
+        with pytest.raises(ValidationError, match=str(TrackSchema.SEASON_WEEKS)):
             TrackSchema(**data)
 
     def test_rejects_empty_list(self) -> None:
@@ -140,13 +140,13 @@ class TestTrackSchemaTemperatureValidation:
         }
         
         # Act & Assert
-        with pytest.raises(ValidationError, match="40"):
+        with pytest.raises(ValidationError, match=str(TrackSchema.SEASON_WEEKS)):
             TrackSchema(**data)
 
     def test_accepts_negative_temperatures(self) -> None:
         """TrackSchema should accept negative temperature values."""
         # Arrange
-        temps = [-5.0, -4.0, -3.0, -2.0, -1.0] + list(range(0, 35))
+        temps = [-5.0, -4.0, -3.0, -2.0, -1.0] + list(range(0, TrackSchema.SEASON_WEEKS - 5))
         data = {
             'ID': 1,
             'City': 'Montreal',
@@ -164,7 +164,7 @@ class TestTrackSchemaTemperatureValidation:
         
         # Assert
         assert any(t < 0 for t in track.temperatures)
-        assert len(track.temperatures) == 40
+        assert len(track.temperatures) == TrackSchema.SEASON_WEEKS
 
     def test_rejects_oversized_json_string(self) -> None:
         """TrackSchema should reject JSON strings exceeding 1 KB."""
@@ -190,7 +190,7 @@ class TestTrackSchemaTemperatureValidation:
     def test_rejects_json_with_non_numeric_values(self) -> None:
         """TrackSchema should reject JSON array with non-numeric values."""
         # Arrange
-        temps = list(range(1, 39)) + ['not_a_number', 40.0]
+        temps = list(range(1, TrackSchema.SEASON_WEEKS - 1)) + ['not_a_number', 40.0]
         json_str = json.dumps(temps)
         data = {
             'ID': 1,
@@ -264,7 +264,7 @@ class TestTrackSchemaFieldValidation:
             'Latitude': 0.0,
             'Longitude': 0.0,
             'UTC_Offset': 0,
-            'Temperatures': list(range(1, 41)),
+            'Temperatures': list(range(1, TrackSchema.SEASON_WEEKS + 1)),
         }
         
         # Act & Assert
@@ -283,7 +283,7 @@ class TestTrackSchemaFieldValidation:
             'Latitude': 'not a number',
             'Longitude': 0.0,
             'UTC_Offset': 0,
-            'Temperatures': list(range(1, 41)),
+            'Temperatures': list(range(1, TrackSchema.SEASON_WEEKS + 1)),
         }
         
         # Act & Assert
@@ -302,7 +302,7 @@ class TestTrackSchemaFieldValidation:
             'Latitude': 0.0,
             'Longitude': 0.0,
             'UTC_Offset': 'invalid',
-            'Temperatures': list(range(1, 41)),
+            'Temperatures': list(range(1, TrackSchema.SEASON_WEEKS + 1)),
         }
         
         # Act & Assert
@@ -334,7 +334,7 @@ class TestTrackSchemaRealData:
         # Assert
         assert track.id == 1
         assert track.city == 'Melbourne'
-        assert len(track.temperatures) == 40
+        assert len(track.temperatures) == TrackSchema.SEASON_WEEKS
 
     def test_lusail_track(self) -> None:
         """TrackSchema should validate real Lusail track data."""
@@ -358,5 +358,5 @@ class TestTrackSchemaRealData:
         assert track.id == 23
         assert track.city == 'Lusail'
         assert track.region == 'Middle East'
-        assert len(track.temperatures) == 40
+        assert len(track.temperatures) == TrackSchema.SEASON_WEEKS
         assert all(isinstance(t, float) for t in track.temperatures)

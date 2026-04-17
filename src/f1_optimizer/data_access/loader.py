@@ -54,6 +54,7 @@ class CsvTrackLoader:
         track_db: dict[int, TrackSchema] = {}
         invalid_rows: list[tuple[int, str]] = []
         duplicate_ids: list[int] = []
+        seen_ids: dict[int, int] = {}  # Maps ID to first row number where it appeared
 
         try:
             with self.file_path.open('r', encoding='utf-8') as csvfile:
@@ -64,7 +65,7 @@ class CsvTrackLoader:
 
                 for row_num, row in enumerate(reader, start=2):
                     self._validate_and_add_track(
-                        row_num, row, track_db, invalid_rows, duplicate_ids
+                        row_num, row, track_db, invalid_rows, duplicate_ids, seen_ids
                     )
 
         except FileNotFoundError as e:
@@ -102,24 +103,44 @@ class CsvTrackLoader:
         track_db: dict[int, TrackSchema],
         invalid_rows: list[tuple[int, str]],
         duplicate_ids: list[int],
+        seen_ids: dict[int, int],
     ) -> None:
-        """Validate and add a single track row, handling errors and duplicates."""
+        """Validate and add a single track row, handling errors and duplicates.
+        
+        Args:
+            row_num: The row number in the CSV (1-indexed header, so data starts at 2).
+            row: The raw row dict from csv.DictReader.
+            track_db: The accumulating valid tracks dict.
+            invalid_rows: List of (row_num, error_msg) tuples for failed validations.
+            duplicate_ids: List of IDs that appear more than once.
+            seen_ids: Maps ID to first row number where it appeared (valid or invalid).
+        """
+        # Extract ID from raw row to check duplicates even if validation fails
         try:
-            track = TrackSchema(**row)
-
-            if track.id in track_db:
-                existing = track_db[track.id]
-                if track.id not in duplicate_ids:
-                    duplicate_ids.append(track.id)
+            row_id = int(row.get('ID', -1))
+        except (ValueError, TypeError):
+            row_id = None
+        
+        # Check if this ID was seen before (in valid or invalid rows)
+        if row_id is not None:
+            if row_id in seen_ids:
+                if row_id not in duplicate_ids:
+                    duplicate_ids.append(row_id)
                 logger.error(
-                    f"Row {row_num}: Duplicate ID {track.id} "
-                    f"({existing.city} vs {track.city})"
+                    f"Row {row_num}: Duplicate ID {row_id} (first seen in row {seen_ids[row_id]})"
                 )
             else:
+                seen_ids[row_id] = row_num
+        
+        try:
+            track = TrackSchema(**row)
+            # Only add to track_db if it's not a duplicate
+            if track.id not in duplicate_ids:
                 track_db[track.id] = track
                 logger.debug(f"Loaded {track.id}: {track.city} ({track.country})")
 
         except ValidationError as e:
+            
             error_details = []
             for err in e.errors():
                 # Handle cases where loc might be empty (root-level validators)
