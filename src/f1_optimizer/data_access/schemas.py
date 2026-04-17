@@ -47,21 +47,23 @@ class TrackSchema(BaseModel):
             if not isinstance(parsed, list):
                 raise ValueError("Temperature JSON must contain a list.")
             
-            # Verify all elements are numeric before returning
-            for i, temp in enumerate(parsed):
-                if not isinstance(temp, (int, float)) or isinstance(temp, bool):
-                    raise ValueError(
-                        f"Temperature at index {i} must be numeric, got {type(temp).__name__} "
-                        f"(value: {temp!r})."
-                    )
-            
-            return parsed
+            temps = parsed
         elif isinstance(value, list):
-            return value
+            temps = value
         else:
             raise ValueError(
                 f"Temperatures must be a JSON string or list, got {type(value).__name__}."
             )
+        
+        # Verify all elements are numeric (applies to both JSON and direct list inputs)
+        for i, temp in enumerate(temps):
+            if not isinstance(temp, (int, float)) or isinstance(temp, bool):
+                raise ValueError(
+                    f"Temperature at index {i} must be numeric, got {type(temp).__name__} "
+                    f"(value: {temp!r})."
+                )
+        
+        return temps
 
     @field_validator('temperatures', mode='after')
     @classmethod

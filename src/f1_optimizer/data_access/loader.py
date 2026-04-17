@@ -120,9 +120,16 @@ class CsvTrackLoader:
                 logger.debug(f"Loaded {track.id}: {track.city} ({track.country})")
 
         except ValidationError as e:
-            error_summary = "; ".join(
-                f"{err['loc'][0]}: {err['msg']}" for err in e.errors()
-            )
+            error_details = []
+            for err in e.errors():
+                # Handle cases where loc might be empty (root-level validators)
+                if err['loc']:
+                    field = err['loc'][0]
+                else:
+                    field = "root"
+                error_details.append(f"{field}: {err['msg']}")
+            
+            error_summary = "; ".join(error_details)
             invalid_rows.append((row_num, error_summary))
             logger.error(f"Row {row_num}: {error_summary}")
 
