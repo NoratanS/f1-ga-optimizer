@@ -50,19 +50,7 @@ def count_completeness_violations(chromosome: list[int], num_races: int) -> int:
 
 def count_capacity_violations(chromosome: list[int]) -> int:
     """HC2: Count weeks with more than one race."""
-    violations = 0
-    
-    for week in range(len(chromosome)):
-        race_id = chromosome[week]
-        # Count races scheduled in same week (multiple races if race_id < 100)
-        # In this GA representation, max 1 per week by design
-        # But we still check: if somehow duplicate, count excess
-        races_in_week = sum(1 for w in range(len(chromosome)) if chromosome[w] == race_id and race_id < 100)
-        if races_in_week > 1:
-            violations += races_in_week - 1
-            break  # Avoid double-counting same race
-    
-    # Simpler approach: check each week position
+
     violations = 0
     for week in range(len(chromosome)):
         if chromosome[week] < 100:  # If race scheduled this week
@@ -70,7 +58,6 @@ def count_capacity_violations(chromosome: list[int]) -> int:
             races_this_week = sum(1 for race_id in [chromosome[week]] if race_id < 100)
             if races_this_week > 1:
                 violations += races_this_week - 1
-    
     return violations
 
 
@@ -137,7 +124,7 @@ def count_break_violations(
     start_week, end_week = config.summer_break_window
     
     # Check for 3 consecutive off-weeks within summer window
-    for t in range(start_week, min(end_week - 2, len(y) - 2)):
+    for t in range(start_week, min(end_week - 1, len(y) - 2)):
         if y[t] + y[t + 1] + y[t + 2] == 0:
             return 0  # Found valid break
     
