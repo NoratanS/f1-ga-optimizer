@@ -42,4 +42,4 @@ class TestTournamentSelection:
             Individual([3], fitness=30.0),
         ]
         with pytest.raises(ValueError, match="unevaluated"):
-            tournament_selection(pop, tournament_size=2)
+            tournament_selection(pop, tournament_size=len(pop))
