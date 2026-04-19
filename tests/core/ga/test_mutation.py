@@ -2,13 +2,13 @@ from unittest.mock import patch
 
 
 from f1_optimizer.core.models import Individual
-from f1_optimizer.core.mutation import swap_mutation, inversion_mutation
+from f1_optimizer.core.ga.mutation import swap_mutation, inversion_mutation
 
 
 class TestSwapMutation:
     """Test cases for swap_mutation function."""
 
-    @patch("f1_optimizer.core.mutation.random.sample")
+    @patch("f1_optimizer.core.ga.mutation.random.sample")
     def test_swap_mutation_mocked_swap(self, mock_sample):
         """Test swap_mutation with mocked random.sample for deterministic output."""
         # Mock one call to random.sample: swap positions (0, 2)
@@ -57,7 +57,7 @@ class TestSwapMutation:
 class TestInversionMutation:
     """Test cases for inversion_mutation function."""
 
-    @patch("f1_optimizer.core.mutation.random.randint")
+    @patch("f1_optimizer.core.ga.mutation.random.randint")
     def test_inversion_mutation_mocked_positions(self, mock_randint):
         """Test inversion_mutation with mocked positions for deterministic output."""
         # Mock randint calls: i=1, j=4 (for segment reversal)

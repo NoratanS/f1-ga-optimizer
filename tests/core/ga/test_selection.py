@@ -1,7 +1,7 @@
 import pytest
 
 from f1_optimizer.core.models import Individual
-from f1_optimizer.core.selection import tournament_selection
+from f1_optimizer.core.ga.selection import tournament_selection
 
 
 class TestTournamentSelection:

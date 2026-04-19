@@ -1,14 +1,14 @@
 from unittest.mock import patch
 
 
-from f1_optimizer.core.crossover import crossover_ox1, crossover_pmx
+from f1_optimizer.core.ga.crossover import crossover_ox1, crossover_pmx
 from f1_optimizer.core.models import Individual
 
 
 class TestCrossoverOX1:
     """Test cases for Order Crossover 1 (OX1)."""
 
-    @patch("f1_optimizer.core.crossover.random.randint")
+    @patch("f1_optimizer.core.ga.crossover.random.randint")
     def test_ox1_mocked_crossover_point(self, mock_randint):
         """Test OX1 with mocked cut points for deterministic output."""
         # Mock randint calls: point1=1, point2=3
@@ -92,7 +92,7 @@ class TestCrossoverOX1:
 class TestCrossoverPMX:
     """Test cases for Partially Mapped Crossover (PMX)."""
 
-    @patch("f1_optimizer.core.crossover.random.randint")
+    @patch("f1_optimizer.core.ga.crossover.random.randint")
     def test_pmx_mocked_segment_points(self, mock_randint):
         """Test PMX with mocked segment points for deterministic output."""
         # Mock calls: first for point1, second for point2
