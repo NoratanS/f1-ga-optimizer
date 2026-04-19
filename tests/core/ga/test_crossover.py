@@ -173,3 +173,23 @@ class TestCrossoverPMX:
         
         assert parent1.chromosome == orig_parent1
         assert parent2.chromosome == orig_parent2
+
+    def test_pmx_with_mapping_cycle(self):
+        """Test PMX with genes that create cyclic mappings (no infinite loop)."""
+        # Parent1: [1, 2, 3, 4, 5, 6, 7, 8]
+        # Parent2: [2, 1, 3, 4, 5, 6, 7, 8]
+        # Segment [0:2] creates mapping: 1->2 and 2->1 (a cycle)
+        # Cycle detection should prevent infinite loop when resolving mappings
+        parent1 = Individual(list(range(1, 9)), fitness=None)
+        parent2_chrom = [2, 1] + list(range(3, 9))
+        parent2 = Individual(parent2_chrom, fitness=None)
+        
+        # Should complete without infinite loop
+        child1, child2 = crossover_pmx(parent1, parent2)
+        
+        # Verify valid permutations (all genes 1-8 present exactly once)
+        assert sorted(child1.chromosome) == list(range(1, 9))
+        assert sorted(child2.chromosome) == list(range(1, 9))
+        # Verify fitness is None for new individuals
+        assert child1.fitness is None
+        assert child2.fitness is None

@@ -25,7 +25,7 @@ class GAConfig(BaseModel):
     crossover_type: str = Field(default="ox1", description="Crossover type: 'ox1' or 'pmx'")
     mutation_type: str = Field(default="swap", description="Mutation type: 'swap' or 'inversion'")
     elite_size: int = Field(default=2, ge=0, description="Number of elite individuals to preserve")
-    patience: int = Field(default=20, ge=1, description="Early stopping patience (generations without improvement)")
+    stagnation_threshold: int = Field(default=20, ge=1, description="Early stopping threshold (generations without improvement)")
     
     model_config = ConfigDict(validate_assignment=True)
 
@@ -124,18 +124,24 @@ class GeneticAlgorithm:
         crossover_fn = crossover_ox1 if self.config.crossover_type == "ox1" else crossover_pmx
         mutation_fn = swap_mutation if self.config.mutation_type == "swap" else inversion_mutation
         
+        # Track generation explicitly to avoid off-by-one issues
+        # gen starts at 1 so that generation count matches evolutionary iterations
+        generation = 0
+        
         # Main loop
-        for generation in range(self.config.generations):
-            # Check early stopping
-            if generations_without_improvement >= self.config.patience:
+        for gen in range(1, self.config.generations + 1):
+            # Check early stopping before assigning generation
+            if generations_without_improvement >= self.config.stagnation_threshold:
                 break
+            
+            generation = gen
             
             # Elitism: preserve best individuals (population is already sorted from previous iteration)
             elite = population[:self.config.elite_size]
             
             # Generate offspring through selection, crossover, mutation
             offspring = []
-            while len(offspring) < self.config.population_size - self.config.elite_size:
+            while len(offspring) < self.config.population_size:
                 # Selection
                 parent1 = tournament_selection(population, self.config.tournament_size)
                 parent2 = tournament_selection(population, self.config.tournament_size)
@@ -177,5 +183,5 @@ class GeneticAlgorithm:
             best_individual=best_individual,
             best_fitness_per_gen=best_fitness_per_gen,
             avg_fitness_per_gen=avg_fitness_per_gen,
-            generations_run=generation + 1 if generation >= 0 else 0,
+            generations_run=generation,
         )

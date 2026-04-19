@@ -23,7 +23,7 @@ class TestGAConfig:
         assert config.crossover_type == "ox1"
         assert config.mutation_type == "swap"
         assert config.elite_size == 2
-        assert config.patience == 20
+        assert config.stagnation_threshold == 20
 
     def test_custom_config(self):
         """Should accept custom parameters."""
@@ -72,10 +72,10 @@ class TestGAConfig:
         with pytest.raises(ValueError):
             GAConfig(elite_size=-1)
 
-    def test_reject_invalid_patience(self):
-        """Patience must be >= 1."""
+    def test_reject_invalid_stagnation_threshold(self):
+        """Stagnation threshold must be >= 1."""
         with pytest.raises(ValueError):
-            GAConfig(patience=0)
+            GAConfig(stagnation_threshold=0)
 
     def test_accept_crossover_types(self):
         """Should accept both crossover types."""
@@ -228,12 +228,12 @@ class TestGeneticAlgorithm:
         
         assert report.best_fitness == report.best_fitness_per_gen[-1]
 
-    def test_early_stopping_with_patience(self, fitness_evaluator):
-        """Should stop early if patience exceeded."""
+    def test_early_stopping_with_stagnation_threshold(self, fitness_evaluator):
+        """Should stop early if stagnation_threshold exceeded."""
         config = GAConfig(
             generations=100,
             population_size=50,
-            patience=3,  # Stop after 3 generations without improvement
+            stagnation_threshold=3,  # Stop after 3 generations without improvement
             mutation_probability=0.0,  # Disable mutation to force plateau
             crossover_probability=0.0,  # Disable crossover to force plateau
         )
@@ -362,3 +362,42 @@ class TestGeneticAlgorithm:
         
         report = ga.evolve()
         assert report.best_fitness is not None
+
+    def test_generations_run_off_by_one_accuracy(self, fitness_evaluator):
+        """Verify generations_run is reported accurately with early stopping."""
+        config = GAConfig(
+            generations=100,
+            population_size=10,
+            stagnation_threshold=5,  # Stop after 5 generations without improvement
+            mutation_probability=0.0,  # Disable mutation to force early plateau
+            crossover_probability=0.0,  # Disable crossover to force plateau
+        )
+        ga = GeneticAlgorithm(config, fitness_evaluator)
+        
+        report = ga.evolve()
+        
+        # History should have initial + evolutionary generations
+        # If we run N generations, history has N+1 entries (initial + N evolutionary)
+        assert len(report.best_fitness_per_gen) == report.generations_run + 1
+        assert len(report.avg_fitness_per_gen) == report.generations_run + 1
+        # Should stop well before generation 100 due to early stopping
+        assert report.generations_run < 100
+        # generations_run must be positive
+        assert report.generations_run > 0
+
+    def test_offspring_generation_with_odd_population_size(self, fitness_evaluator):
+        """Verify offspring generation handles odd population_size correctly."""
+        # Odd population: 11 = 10 non-elite + 1
+        config = GAConfig(
+            generations=2,
+            population_size=11,
+            elite_size=2,
+        )
+        ga = GeneticAlgorithm(config, fitness_evaluator)
+        
+        report = ga.evolve()
+        
+        # Should complete without error and produce valid report
+        assert report.best_fitness is not None
+        assert report.best_individual is not None
+        assert len(report.best_fitness_per_gen) == 3  # Initial + 2 generations

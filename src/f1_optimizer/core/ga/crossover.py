@@ -88,20 +88,27 @@ def crossover_pmx(parent1: Individual, parent2: Individual) -> tuple[Individual,
         mapping1[p1[i]] = p2[i]
         mapping2[p2[i]] = p1[i]
     
+    # Helper function to resolve mapping with cycle detection
+    def resolve_mapping(gene, mapping):
+        """Follow mapping chain until no mapping found or cycle detected."""
+        visited = set()
+        while gene in mapping and gene not in visited:
+            visited.add(gene)
+            gene = mapping[gene]
+        return gene
+    
     # Fill remaining positions for child1 (from parent1, following mapping2 for conflicts)
     for i in range(n):
         if i < point1 or i >= point2:
             gene = p1[i]
-            while gene in mapping2:
-                gene = mapping2[gene]
+            gene = resolve_mapping(gene, mapping2)
             child1[i] = gene
     
     # Fill remaining positions for child2 (from parent2, following mapping1 for conflicts)
     for i in range(n):
         if i < point1 or i >= point2:
             gene = p2[i]
-            while gene in mapping1:
-                gene = mapping1[gene]
+            gene = resolve_mapping(gene, mapping1)
             child2[i] = gene
     
     return (
