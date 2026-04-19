@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from f1_optimizer.core.models import Individual
 from f1_optimizer.core.ga.selection import tournament_selection
@@ -28,6 +28,22 @@ class GAConfig(BaseModel):
     stagnation_threshold: int = Field(default=20, ge=1, description="Early stopping threshold (generations without improvement)")
     
     model_config = ConfigDict(validate_assignment=True)
+    
+    @field_validator("crossover_type")
+    @classmethod
+    def validate_crossover_type(cls, v: str) -> str:
+        """Validate crossover type is supported."""
+        if v not in ("ox1", "pmx"):
+            raise ValueError(f"crossover_type must be 'ox1' or 'pmx', got '{v}'")
+        return v
+    
+    @field_validator("mutation_type")
+    @classmethod
+    def validate_mutation_type(cls, v: str) -> str:
+        """Validate mutation type is supported."""
+        if v not in ("swap", "inversion"):
+            raise ValueError(f"mutation_type must be 'swap' or 'inversion', got '{v}'")
+        return v
 
 
 @dataclass
@@ -125,7 +141,10 @@ class GeneticAlgorithm:
         mutation_fn = swap_mutation if self.config.mutation_type == "swap" else inversion_mutation
         
         # Track generation explicitly to avoid off-by-one issues
-        # gen starts at 1 so that generation count matches evolutionary iterations
+        # Loop starts at gen=1 so that generation count directly matches evolutionary iterations.
+        # Early stopping check happens before generation assignment, so if early stop triggers,
+        # that generation is not counted in generations_run (i.e., we didn't evolve that iteration).
+        # Invariant: len(history) == generations_run + 1 (initial evaluation + N evolutionary generations)
         generation = 0
         
         # Main loop

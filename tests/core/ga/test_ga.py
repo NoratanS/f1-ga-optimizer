@@ -77,6 +77,20 @@ class TestGAConfig:
         with pytest.raises(ValueError):
             GAConfig(stagnation_threshold=0)
 
+    def test_reject_invalid_crossover_type(self):
+        """Crossover type must be 'ox1' or 'pmx'."""
+        with pytest.raises(ValueError):
+            GAConfig(crossover_type="uniform")
+        with pytest.raises(ValueError):
+            GAConfig(crossover_type="invalid")
+
+    def test_reject_invalid_mutation_type(self):
+        """Mutation type must be 'swap' or 'inversion'."""
+        with pytest.raises(ValueError):
+            GAConfig(mutation_type="gaussian")
+        with pytest.raises(ValueError):
+            GAConfig(mutation_type="invalid")
+
     def test_accept_crossover_types(self):
         """Should accept both crossover types."""
         config_ox1 = GAConfig(crossover_type="ox1")
