@@ -35,7 +35,8 @@ def write_schedule_md(
     bd = report.fitness_breakdown
     schedule = format_schedule(report.best_individual.chromosome, tracks)
     races = [e for e in schedule if not e.is_break]
-    total_distance_km = bd.distance_penalty / (fitness_config.w_dist * fitness_config.K_dist)
+    dist_divisor = fitness_config.w_dist * fitness_config.K_dist
+    total_distance_km = bd.distance_penalty / dist_divisor if dist_divisor else None
 
     lines = [
         "# F1 Optimized Calendar",
@@ -46,7 +47,7 @@ def write_schedule_md(
         f"- Generations Run: {report.generations_run}/{ga_config.generations}",
         f"- Crossover: {ga_config.crossover_type} (p={ga_config.crossover_probability})",
         f"- Mutation: {ga_config.mutation_type} (p={ga_config.mutation_probability})",
-        f"- Total Distance: {total_distance_km:,.0f} km",
+        f"- Total Distance: {f'{total_distance_km:,.0f} km' if total_distance_km is not None else 'N/A'}",
         "",
         "## Fitness Results",
         "",
@@ -95,9 +96,10 @@ def write_summary_md(
             f"| {rank} | {name} | {report.best_fitness:,.2f}"
             f" | {report.generations_run}/{ga_config.generations} |"
         )
-    lines += [
-        "",
-        f"**Best configuration:** {sorted_results[0][0]}  ",
-        f"**Best fitness score:** {sorted_results[0][2].best_fitness:,.2f}",
-    ]
+    if sorted_results:
+        lines += [
+            "",
+            f"**Best configuration:** {sorted_results[0][0]}  ",
+            f"**Best fitness score:** {sorted_results[0][2].best_fitness:,.2f}",
+        ]
     path.write_text("\n".join(lines) + "\n")
