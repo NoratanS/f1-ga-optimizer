@@ -11,7 +11,14 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.13.0",
     "numpy>=1.24.0",
+    "typer>=0.9.0",
+    "rich>=13.5.0",
+    "seaborn>=0.12.0",
+    "matplotlib>=3.7.0",
 ]
+
+[project.scripts]
+f1-optimizer = "f1_optimizer.cli:main"
 
 [dependency-groups]
 dev = [

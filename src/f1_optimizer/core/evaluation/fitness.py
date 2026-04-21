@@ -1,11 +1,36 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pydantic import BaseModel, Field, field_validator
 
 from .hard_constraints import evaluate_hard_constraints
 from .soft_constraints import evaluate_soft_constraints
 from f1_optimizer.core.models import Individual
 from .distance_matrix import DistanceMatrix
+
+
+@dataclass
+class FitnessBreakdown:
+    """Detailed breakdown of fitness score components."""
+    
+    total_fitness: float
+    distance_penalty: float
+    environment_penalty: float
+    jetlag_penalty: float
+    headers_penalty: float
+    logistics_penalty: float
+    hard_violations_penalty: float
+    
+    @property
+    def soft_penalties_total(self) -> float:
+        """Sum of all soft constraint penalties."""
+        return (
+            self.distance_penalty +
+            self.environment_penalty +
+            self.jetlag_penalty +
+            self.headers_penalty +
+            self.logistics_penalty
+        )
 
 
 class FitnessConfig(BaseModel):
@@ -149,6 +174,43 @@ class FitnessEvaluator:
         F = Z + (self.config.M * hc_violations.total)
         
         return F
+    
+    def get_fitness_breakdown(self, individual: Individual) -> FitnessBreakdown:
+        """Get detailed breakdown of fitness score for an individual.
+        
+        Args:
+            individual: Individual to analyze
+            
+        Returns:
+            FitnessBreakdown with detailed component values
+        """
+        # Evaluate hard constraints
+        hc_violations = evaluate_hard_constraints(
+            individual.chromosome,
+            self.distance_matrix,
+            self.config,
+            self.middle_east_races
+        )
+        
+        # Evaluate soft constraints
+        sc_penalties = evaluate_soft_constraints(
+            individual.chromosome,
+            self.distance_matrix,
+            self.config
+        )
+        
+        # Calculate hard violations penalty
+        hard_penalty = self.config.M * hc_violations.total
+        
+        return FitnessBreakdown(
+            total_fitness=individual.fitness or self.evaluate_individual(individual),
+            distance_penalty=self.config.w_dist * sc_penalties.distance,
+            environment_penalty=self.config.w_env * sc_penalties.environment,
+            jetlag_penalty=self.config.w_hum * sc_penalties.jetlag,
+            headers_penalty=self.config.w_hum * sc_penalties.headers,
+            logistics_penalty=self.config.w_log * sc_penalties.logistics,
+            hard_violations_penalty=hard_penalty,
+        )
     
     def evaluate_population(self, population: list[Individual]) -> None:
         """Evaluate fitness for all individuals in-place."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
@@ -11,7 +12,7 @@ from f1_optimizer.core.models import Individual
 from f1_optimizer.core.ga.selection import tournament_selection
 from f1_optimizer.core.ga.mutation import swap_mutation, inversion_mutation
 from f1_optimizer.core.ga.crossover import crossover_ox1, crossover_pmx
-from f1_optimizer.core.evaluation.fitness import FitnessEvaluator
+from f1_optimizer.core.evaluation.fitness import FitnessEvaluator, FitnessBreakdown
 
 
 class GAConfig(BaseModel):
@@ -55,6 +56,7 @@ class GAReport:
     avg_fitness_per_gen: list[float]
     best_fitness_per_gen: list[float]
     generations_run: int
+    fitness_breakdown: Optional[FitnessBreakdown] = None
     
     def summary(self) -> str:
         """Return human-readable summary."""
@@ -197,10 +199,14 @@ class GeneticAlgorithm:
             best_fitness_per_gen.append(best_fitness)
             avg_fitness_per_gen.append(sum(ind.fitness for ind in population) / len(population))
         
+        # Calculate fitness breakdown for the best individual
+        fitness_breakdown = self.fitness_evaluator.get_fitness_breakdown(best_individual)
+        
         return GAReport(
             best_fitness=best_fitness,
             best_individual=best_individual,
             best_fitness_per_gen=best_fitness_per_gen,
             avg_fitness_per_gen=avg_fitness_per_gen,
             generations_run=generation,
+            fitness_breakdown=fitness_breakdown,
         )
