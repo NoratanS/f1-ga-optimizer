@@ -1,119 +1,146 @@
-"""Configuration loading and management for F1 GA Optimizer."""
+"""Configuration loading for F1 GA Optimizer."""
 
-from pathlib import Path
+from __future__ import annotations
+
+import itertools
 import tomllib
+from pathlib import Path
 
-from f1_optimizer.core.ga.ga import GAConfig
 from f1_optimizer.core.evaluation.fitness import FitnessConfig
+from f1_optimizer.core.ga.ga import GAConfig
 
 
 class ConfigLoadError(Exception):
     """Error loading or parsing config file."""
-    pass
 
 
-def load_config_file(config_path: Path | None) -> tuple[FitnessConfig, GAConfig]:
-    """Load and merge configuration from TOML file with defaults.
-    
-    Args:
-        config_path: Path to TOML config file, or None for defaults only
-        
-    Returns:
-        (FitnessConfig, GAConfig) instances with merged values
-        
-    Raises:
-        ConfigLoadError: If config file is invalid or can't be parsed
-    """
-    # Start with defaults
-    fitness_config = FitnessConfig()
-    ga_config = GAConfig()
-    
+def load_fitness_config(config_path: Path | None) -> FitnessConfig:
+    """Load FitnessConfig from a flat TOML file, or return defaults."""
     if config_path is None:
-        return fitness_config, ga_config
-    
-    # Validate file exists
-    if not config_path.exists():
-        raise ConfigLoadError(f"Config file not found: {config_path}")
-    
-    if not config_path.is_file():
-        raise ConfigLoadError(f"Config path is not a file: {config_path}")
-    
-    # Parse TOML
+        return FitnessConfig()
+    raw = _load_toml(config_path)
     try:
-        with open(config_path, "rb") as f:
-            config_dict = tomllib.load(f)
+        return FitnessConfig(**raw)
+    except Exception as e:
+        raise ConfigLoadError(f"Invalid fitness config: {e}") from e
+
+
+def load_ga_config(config_path: Path | None) -> GAConfig:
+    """Load GAConfig from a flat TOML file, or return defaults.
+
+    Raises ConfigLoadError if the file contains list values — use expand_ga_configs for multi-config.
+    """
+    if config_path is None:
+        return GAConfig()
+    raw = _load_toml(config_path)
+    list_fields = [k for k, v in raw.items() if isinstance(v, list)]
+    if list_fields:
+        raise ConfigLoadError(
+            f"Config has list values for: {list_fields}. Use --multi-config to run permutations."
+        )
+    try:
+        return GAConfig(**raw)
+    except Exception as e:
+        raise ConfigLoadError(f"Invalid GA config: {e}") from e
+
+
+def expand_ga_configs(config_path: Path | None) -> list[tuple[str, GAConfig]]:
+    """Parse a flat GA config TOML supporting list values, expand into all permutations.
+
+    Returns a list of (config_name, GAConfig) tuples.
+    """
+    if config_path is None:
+        return [("config_1", GAConfig())]
+    raw = _load_toml(config_path)
+    scalars = {k: v for k, v in raw.items() if not isinstance(v, list)}
+    lists = {k: v for k, v in raw.items() if isinstance(v, list)}
+
+    field_names = list(lists.keys())
+    field_values = list(lists.values())
+    configs: list[tuple[str, GAConfig]] = []
+    for i, combo in enumerate(itertools.product(*field_values)):
+        combo_dict = {**scalars, **dict(zip(field_names, combo))}
+        name_parts = [f"config_{i + 1}"]
+        for field, val in zip(field_names, combo):
+            name_parts.append(f"{_abbr(field)}{val}")
+        name = "_".join(name_parts)
+        try:
+            ga_config = GAConfig(**combo_dict)
+        except Exception as e:
+            raise ConfigLoadError(f"Invalid config for {name}: {e}") from e
+        configs.append((name, ga_config))
+    return configs
+
+
+_ABBR: dict[str, str] = {
+    "population_size": "ps",
+    "generations": "g",
+    "crossover_probability": "cp",
+    "mutation_probability": "mp",
+    "tournament_size": "ts",
+    "elite_size": "es",
+    "stagnation_threshold": "st",
+    "crossover_type": "cx",
+    "mutation_type": "mt",
+}
+
+
+def _abbr(field: str) -> str:
+    return _ABBR.get(field, field[:2])
+
+
+def _load_toml(path: Path) -> dict:
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except FileNotFoundError:
+        raise ConfigLoadError(f"Config file not found: {path}")
+    except IsADirectoryError:
+        raise ConfigLoadError(f"Config path is not a file: {path}")
     except tomllib.TOMLDecodeError as e:
-        raise ConfigLoadError(f"Invalid TOML syntax in {config_path}: {e}")
+        raise ConfigLoadError(f"Invalid TOML in {path}: {e}") from e
     except Exception as e:
-        raise ConfigLoadError(f"Failed to read {config_path}: {e}")
-    
-    # Extract sections
-    fitness_section = config_dict.get("fitness", {})
-    ga_section = config_dict.get("ga", {})
-    
-    # Create updated configs with merged values
-    try:
-        fitness_config = FitnessConfig(**fitness_section)
-    except Exception as e:
-        raise ConfigLoadError(f"Invalid fitness config: {e}")
-    
-    try:
-        ga_config = GAConfig(**ga_section)
-    except Exception as e:
-        raise ConfigLoadError(f"Invalid GA config: {e}")
-    
-    return fitness_config, ga_config
+        raise ConfigLoadError(f"Failed to read {path}: {e}") from e
 
 
-def create_example_config() -> str:
-    """Generate an example config file as string."""
-    return """# F1 GA Optimizer Configuration
+def create_example_fitness_config() -> str:
+    return """\
+# F1 GA Optimizer - Fitness Configuration
+K_dist = 1.0
+K_env = 1000.0
+K_utc = 500.0
+K_double = 5000.0
+K_triple = 15000.0
+K_bounce = 10000.0
+K_flyaway = 50000.0
+M = 1000000.0
 
-[fitness]
-# Penalty coefficients (K_* parameters)
-K_dist = 1.0           # Penalty per km of travel
-K_env = 1000.0         # Penalty per °C temperature deviation
-K_utc = 500.0          # Base penalty for timezone shifts
-K_double = 5000.0      # Penalty for double-header week
-K_triple = 15000.0     # Penalty for triple-header week
-K_bounce = 10000.0     # Penalty for region change
-K_flyaway = 50000.0    # Penalty for inter-continental back-to-back
-M = 1000000.0          # Big-M multiplier for hard constraint violations
+w_dist = 0.25
+w_env = 0.25
+w_log = 0.25
+w_hum = 0.25
 
-# Optimization weights (should sum to ~1.0)
-w_dist = 0.25          # Weight for distance penalty
-w_env = 0.25           # Weight for environment penalty
-w_log = 0.25           # Weight for logistics penalty
-w_hum = 0.25           # Weight for human fatigue penalties
+T_hard_min = 5.0
+T_hard_max = 40.0
+T_opt_min = 18.0
+T_opt_max = 28.0
 
-# Temperature thresholds (°C)
-T_hard_min = 5.0       # Hard constraint minimum
-T_hard_max = 40.0      # Hard constraint maximum
-T_opt_min = 18.0       # Soft constraint minimum (optimal)
-T_opt_max = 28.0       # Soft constraint maximum (optimal)
-
-# Back-to-back distance limit (km)
 L_max = 8000.0
+summer_break_window = [17, 26]
+ramadan_window = [6, 10]
+"""
 
-# Seasonal windows (0-indexed week ranges, inclusive)
-summer_break_window = [17, 26]    # Summer break window
-ramadan_window = [6, 10]          # Ramadan observance window
 
-[ga]
-# Population and evolution
-population_size = 50       # Number of individuals per generation
-generations = 100          # Number of generations to run
-stagnation_threshold = 20  # Early stopping patience (gens without improvement)
-elite_size = 2             # Number of elite individuals to preserve
-
-# Operators
-crossover_type = "ox1"     # "ox1" or "pmx"
-mutation_type = "swap"     # "swap" or "inversion"
-
-# Probabilities
-crossover_probability = 0.8  # Chance of crossover per pair
-mutation_probability = 0.1   # Chance of mutation per individual
-
-# Selection
-tournament_size = 5        # Tournament selection pool size
+def create_example_ga_config() -> str:
+    return """\
+# F1 GA Optimizer - GA Configuration
+population_size = 100
+generations = 1000
+crossover_probability = 0.8
+mutation_probability = 0.1
+crossover_type = "ox1"
+mutation_type = "swap"
+tournament_size = 5
+stagnation_threshold = 50
+elite_size = 2
 """

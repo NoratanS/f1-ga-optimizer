@@ -1,0 +1,10 @@
+# F1 GA Optimizer - GA Configuration
+population_size = 100
+generations = 1000
+crossover_probability = [0.8, 0.9]
+mutation_probability = 0.1
+crossover_type = ["ox1", "pmx"]
+mutation_type = ["swap", "inversion"]
+tournament_size = [3, 5]
+stagnation_threshold = 100
+elite_size = 2

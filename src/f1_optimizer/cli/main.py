@@ -1,218 +1,127 @@
-"""CLI for F1 Calendar GA Optimizer using Typer and Rich."""
+"""CLI for F1 Calendar GA Optimizer."""
 
+from __future__ import annotations
+
+import time
 from pathlib import Path
+
 import typer
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
+from f1_optimizer.cli.config import (
+    ConfigLoadError,
+    create_example_fitness_config,
+    create_example_ga_config,
+    expand_ga_configs,
+    load_fitness_config,
+    load_ga_config,
+)
+from f1_optimizer.cli.runner import run_multi_config, run_single_config
+from f1_optimizer.core.evaluation.distance_matrix import DistanceMatrix
+from f1_optimizer.core.evaluation.fitness import FitnessEvaluator
 from f1_optimizer.data_access.loader import CsvTrackLoader, CsvTrackLoaderError
-from f1_optimizer.core.evaluation.fitness import FitnessEvaluator, DistanceMatrix
-from f1_optimizer.core.ga.ga import GeneticAlgorithm
-from f1_optimizer.cli.config import load_config_file, ConfigLoadError, create_example_config
-from f1_optimizer.cli.schedule import format_schedule, format_schedule_display
 
-app = typer.Typer(help="F1 Calendar Genetic Algorithm Optimizer")
+app = typer.Typer(help="F1 Calendar Genetic Algorithm Optimizer", add_completion=False)
 console = Console()
 
 
 @app.command()
 def optimize(
-    data_file: Path = typer.Argument(
-        ...,
-        help="Path to CSV file with F1 track data",
-        exists=True,
+    data_file: Path = typer.Argument(..., help="Path to CSV file with F1 track data", exists=True),
+    fitness_config: Path | None = typer.Option(
+        None, "--fitness-config", "-f", help="Fitness config TOML (uses defaults if omitted)"
     ),
     config: Path | None = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Path to TOML config file (uses defaults if not provided)",
-        exists=True,
+        None, "--config", "-c", help="GA config TOML (uses defaults if omitted)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output",
-    ),
+    output: Path = typer.Option(Path("results"), "--output", "-o", help="Output directory"),
+    multi_config: bool = typer.Option(False, "--multi-config", help="Run all parameter permutations"),
+    runs: int = typer.Option(1, "--runs", help="Repeat each config N times, report best", min=1),
 ) -> None:
-    """Optimize F1 calendar schedule using Genetic Algorithm.
-    
-    Takes a CSV file with track data and runs the GA to find an optimized
-    schedule that minimizes travel distance between races.
-    """
+    """Optimize F1 calendar schedule using Genetic Algorithm."""
     try:
-        console.print("[bold cyan]🏎️  F1 Calendar GA Optimizer[/bold cyan]")
-        console.print()
-        
-        # Load configuration
-        console.print("[yellow]Loading configuration...[/yellow]")
-        fitness_config, ga_config = load_config_file(config)
-        if config:
-            console.print(f"[green]✓ Loaded config from {config}[/green]")
-        else:
-            console.print("[green]✓ Using default configuration[/green]")
-        console.print()
-        
-        # Load track data
-        console.print(f"[yellow]Loading track data from:[/yellow] {data_file}")
-        loader = CsvTrackLoader(data_file)
-        tracks = loader.load()
-        console.print(f"[green]✓ Loaded {len(tracks)} tracks[/green]")
-        console.print()
-        
-        # Initialize fitness evaluator
-        distance_matrix = DistanceMatrix(tracks)
-        fitness_evaluator = FitnessEvaluator(distance_matrix, fitness_config)
-        
-        # Display GA configuration
-        console.print("[yellow]GA Configuration:[/yellow]")
-        config_table = Table(show_header=False, box=None)
-        config_table.add_row("Population Size", str(ga_config.population_size))
-        config_table.add_row("Generations", str(ga_config.generations))
-        config_table.add_row("Crossover Type", ga_config.crossover_type)
-        config_table.add_row("Mutation Type", ga_config.mutation_type)
-        config_table.add_row("Stagnation Threshold", str(ga_config.stagnation_threshold))
-        console.print(config_table)
-        console.print()
-        
-        # Run GA with progress bar
-        console.print("[yellow]Running genetic algorithm...[/yellow]")
-        ga = GeneticAlgorithm(ga_config, fitness_evaluator)
-        
+        start = time.monotonic()
+
+        f_config = load_fitness_config(fitness_config)
+        tracks = CsvTrackLoader(data_file).load()
+        fitness_evaluator = FitnessEvaluator(DistanceMatrix(tracks), f_config)
+
         with Progress(
             SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
             console=console,
+            transient=True,
         ) as progress:
-            task = progress.add_task("Evolving population...", total=ga_config.generations)
-            
-            # Run evolution
-            report = ga.evolve()
-            progress.update(task, completed=report.generations_run)
-        
-        console.print()
-        
-        # Display results
-        display_results(report, tracks, verbose)
-        
-        console.print("[green]✓ Optimization complete![/green]")
-        
+            if multi_config:
+                configs = expand_ga_configs(config)
+                task = progress.add_task(f"Config 1/{len(configs)}...", total=None)
+
+                def on_start(name: str, idx: int, total: int) -> None:
+                    progress.update(task, description=f"Config {idx + 1}/{total}: {name}")
+
+                run_multi_config(
+                    configs,
+                    fitness_evaluator,
+                    tracks,
+                    output,
+                    runs=runs,
+                    on_config_start=on_start,
+                )
+            else:
+                ga_config = load_ga_config(config)
+                progress.add_task("Evolving...", total=None)
+                run_single_config(ga_config, fitness_evaluator, tracks, output, runs=runs)
+
+        elapsed = time.monotonic() - start
+        console.print(f"Done in {elapsed:.1f}s → {output}/")
+
     except ConfigLoadError as e:
-        console.print(f"[red]✗ Config Error:[/red] {e}", style="bold red")
+        console.print(f"[red]Config error:[/red] {e}")
         raise typer.Exit(code=1)
     except CsvTrackLoaderError as e:
-        console.print(f"[red]✗ Data Loading Error:[/red] {e}", style="bold red")
+        console.print(f"[red]Data error:[/red] {e}")
         raise typer.Exit(code=1)
     except ValueError as e:
-        console.print(f"[red]✗ Configuration Error:[/red] {e}", style="bold red")
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"[red]✗ Unexpected Error:[/red] {e}", style="bold red")
-        if verbose:
-            console.print_exception()
+        console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(code=1)
 
 
 @app.command()
 def generate_config(
-    output: Path = typer.Option(
-        Path("config.toml"),
-        "--output",
-        "-o",
-        help="Output path for the generated config file",
+    output_dir: Path = typer.Option(
+        Path("."), "--output-dir", "-o", help="Directory to write config files"
     ),
 ) -> None:
-    """Generate an example configuration file.
-    
-    Creates a TOML config file with all available options and descriptions.
-    You can customize this file and pass it with --config flag.
-    """
+    """Generate example fitness_config.toml and ga_config.toml."""
     try:
-        if output.exists():
-            overwrite = typer.confirm(f"{output} already exists. Overwrite?")
-            if not overwrite:
-                console.print("[yellow]Aborted[/yellow]")
-                raise typer.Exit(code=0)
-        
-        output.write_text(create_example_config())
-        console.print(f"[green]✓ Generated example config: {output}[/green]")
-        console.print(f"[cyan]Edit it and use: f1-optimizer optimize data/data.csv --config {output}[/cyan]")
-        
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for filename, content in [
+            ("fitness_config.toml", create_example_fitness_config()),
+            ("ga_config.toml", create_example_ga_config()),
+        ]:
+            path = output_dir / filename
+            if path.exists():
+                if not typer.confirm(f"{path} already exists. Overwrite?"):
+                    continue
+            path.write_text(content)
+            console.print(f"[green]Created:[/green] {path}")
+
+        console.print(
+            f"\nUsage: f1-optimizer optimize data.csv"
+            f" --fitness-config {output_dir}/fitness_config.toml"
+            f" --config {output_dir}/ga_config.toml"
+        )
     except Exception as e:
-        console.print(f"[red]✗ Error creating config:[/red] {e}", style="bold red")
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1)
 
 
-def display_results(report, tracks, verbose: bool) -> None:
-    """Display optimization results using Rich formatting."""
-    # Best fitness panel
-    best_fitness_panel = Panel(
-        f"[bold cyan]{report.best_fitness:,.2f}[/bold cyan]",
-        title="[bold]Best Fitness Score[/bold]",
-        expand=False,
-    )
-    console.print(best_fitness_panel)
-    console.print()
-    
-    # Fitness breakdown from report
-    breakdown = report.fitness_breakdown
-    console.print("[bold]Fitness Breakdown[/bold]")
-    breakdown_table = Table(show_header=False, box=None)
-    breakdown_table.add_row("Distance Penalty", f"{breakdown.distance_penalty:,.2f}")
-    breakdown_table.add_row("Environment Penalty", f"{breakdown.environment_penalty:,.2f}")
-    breakdown_table.add_row("Jetlag Penalty", f"{breakdown.jetlag_penalty:,.2f}")
-    breakdown_table.add_row("Headers Penalty", f"{breakdown.headers_penalty:,.2f}")
-    breakdown_table.add_row("Logistics Penalty", f"{breakdown.logistics_penalty:,.2f}")
-    breakdown_table.add_row("Soft Total", f"[yellow]{breakdown.soft_penalties_total:,.2f}[/yellow]")
-    breakdown_table.add_row("Hard Violations Penalty", f"{breakdown.hard_violations_penalty:,.2f}")
-    breakdown_table.add_row("Total", f"[cyan]{breakdown.total_fitness:,.2f}[/cyan]")
-    console.print(breakdown_table)
-    console.print()
-    
-    # Statistics table
-    stats_table = Table(title="[bold]Statistics[/bold]", show_header=False, box=None)
-    stats_table.add_row("Generations Run", str(report.generations_run))
-    stats_table.add_row("Final Average Fitness", f"{report.avg_fitness_per_gen[-1]:,.2f}")
-    stats_table.add_row("Improvement", f"{(report.best_fitness_per_gen[0] - report.best_fitness):,.2f}")
-    console.print(stats_table)
-    console.print()
-    
-    # Best schedule
-    schedule = format_schedule(report.best_individual.chromosome, tracks)
-    console.print("[bold]Optimized Schedule[/bold]")
-    schedule_display = format_schedule_display(schedule, compact=True)
-    console.print(schedule_display)
-    console.print()
-    
-    if verbose:
-        # Detailed verbose output
-        console.print("[bold]Full Schedule with Breaks[/bold]")
-        full_schedule_display = format_schedule_display(schedule, compact=False)
-        console.print(full_schedule_display)
-        console.print()
-        
-        console.print("[bold]Fitness History (first 10 gens):[/bold]")
-        history_table = Table(show_header=True)
-        history_table.add_column("Generation", style="cyan")
-        history_table.add_column("Best Fitness", style="green")
-        history_table.add_column("Avg Fitness", style="yellow")
-        
-        for i, (best, avg) in enumerate(
-            zip(
-                report.best_fitness_per_gen[:10],
-                report.avg_fitness_per_gen[:10],
-            )
-        ):
-            history_table.add_row(str(i), f"{best:,.2f}", f"{avg:,.2f}")
-        console.print(history_table)
-
-
 def main() -> None:
-    """Main entry point for the CLI."""
     app()
 
 
