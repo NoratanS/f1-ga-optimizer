@@ -125,7 +125,6 @@ T_hard_max = 40.0
 T_opt_min = 18.0
 T_opt_max = 28.0
 
-L_max = 8000.0
 summer_break_window = [17, 26]
 ramadan_window = [6, 10]
 """

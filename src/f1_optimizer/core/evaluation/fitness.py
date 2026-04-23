@@ -57,9 +57,6 @@ class FitnessConfig(BaseModel):
     T_hard_max: float = Field(default=40.0, description="Hard constraint maximum temperature (°C)")
     T_opt_min: float = Field(default=18.0, description="Soft constraint minimum temperature (°C)")
     T_opt_max: float = Field(default=28.0, description="Soft constraint maximum temperature (°C)")
-    
-    # Back-to-back distance limit
-    L_max: float = Field(default=8000.0, gt=0, description="Max back-to-back distance")
 
     # Seasonal windows (0-indexed week ranges, inclusive)
     summer_break_window: tuple[int, int] = Field(

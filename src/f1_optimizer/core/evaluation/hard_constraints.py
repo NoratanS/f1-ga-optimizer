@@ -12,17 +12,16 @@ if TYPE_CHECKING:
 
 
 class HardConstraintViolations(BaseModel):
-    """Immutable result object for all HC1-HC7 violation counts."""
+    """Immutable result object for all HC1-HC6 violation counts."""
     
     model_config = ConfigDict(frozen=True)
 
     completeness: int = Field(default=0, ge=0, description="HC1 violation count")
     capacity: int = Field(default=0, ge=0, description="HC2 violation count")
     weather: int = Field(default=0, ge=0, description="HC3 violation count")
-    freight: int = Field(default=0, ge=0, description="HC4 violation count")
-    burnout: int = Field(default=0, ge=0, description="HC5 violation count")
-    break_requirement: int = Field(default=0, ge=0, description="HC6 violation count")
-    ramadan: int = Field(default=0, ge=0, description="HC7 violation count")
+    burnout: int = Field(default=0, ge=0, description="HC4 violation count")
+    break_requirement: int = Field(default=0, ge=0, description="HC5 violation count")
+    ramadan: int = Field(default=0, ge=0, description="HC6 violation count")
 
     @property
     def total(self) -> int:
@@ -31,7 +30,7 @@ class HardConstraintViolations(BaseModel):
 
 
 # ============================================================================
-# Hard Constraint Evaluation Functions (HC1-HC7)
+# Hard Constraint Evaluation Functions (HC1-HC6)
 # ============================================================================
 
 
@@ -78,27 +77,8 @@ def count_weather_violations(
     return violations
 
 
-def count_freight_violations(
-    chromosome: list[int],
-    distance_matrix: DistanceMatrix,
-    config: FitnessConfig
-) -> int:
-    """HC4: Count back-to-back races exceeding L_max distance."""
-    omega, tau = extract_race_sequence(chromosome)
-    violations = 0
-    
-    for k in range(len(omega) - 1):
-        # Check if races k and k+1 are back-to-back (consecutive weeks)
-        if tau[k + 1] - tau[k] == 1:
-            distance = distance_matrix.get_distance(omega[k], omega[k + 1])
-            if distance > config.L_max:
-                violations += 1
-    
-    return violations
-
-
 def count_burnout_violations(chromosome: list[int]) -> int:
-    """HC5: Count windows with 4+ consecutive race weeks."""
+    """HC4: Count windows with 4+ consecutive race weeks."""
     # Build y_t vector (1 if race in week, 0 if break)
     y = [1 if chromosome[t] < 100 else 0 for t in range(len(chromosome))]
     
@@ -117,7 +97,7 @@ def count_break_violations(
     chromosome: list[int],
     config: FitnessConfig
 ) -> int:
-    """HC6: Check for 3 consecutive off-weeks in summer window."""
+    """HC5: Check for 3 consecutive off-weeks in summer window."""
     # Build y_t vector
     y = [1 if chromosome[t] < 100 else 0 for t in range(len(chromosome))]
     
@@ -136,7 +116,7 @@ def count_ramadan_violations(
     config: FitnessConfig,
     middle_east_races: set[int]
 ) -> int:
-    """HC7: Count Middle East races during Ramadan window."""
+    """HC6: Count Middle East races during Ramadan window."""
     if not middle_east_races:
         return 0  # No Middle East races in dataset
     
@@ -157,12 +137,11 @@ def evaluate_hard_constraints(
     config: FitnessConfig,
     middle_east_races: set[int]
 ) -> HardConstraintViolations:
-    """Evaluate all HC1-HC7 constraints and return violation counts."""
+    """Evaluate all HC1-HC6 constraints and return violation counts."""
     return HardConstraintViolations(
         completeness=count_completeness_violations(chromosome, distance_matrix.num_races),
         capacity=count_capacity_violations(chromosome),
         weather=count_weather_violations(chromosome, distance_matrix, config),
-        freight=count_freight_violations(chromosome, distance_matrix, config),
         burnout=count_burnout_violations(chromosome),
         break_requirement=count_break_violations(chromosome, config),
         ramadan=count_ramadan_violations(chromosome, config, middle_east_races),
