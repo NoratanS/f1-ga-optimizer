@@ -7,10 +7,15 @@ A Genetic Algorithm engine that optimizes the Formula 1 race calendar — minimi
 
 ## Architecture
 
-- **`core/`** — GA engine: selection, crossover, mutation, fitness evaluation
+- **`core/`** — GA engine and fitness evaluation
+  - **`core/ga/`** — evolutionary loop ([ga.py](src/f1_optimizer/core/ga/ga.py)), tournament [selection](src/f1_optimizer/core/ga/selection.py), [crossover](src/f1_optimizer/core/ga/crossover.py) operators (OX1, PMX), and [mutation](src/f1_optimizer/core/ga/mutation.py) operators (swap, inversion)
+  - **`core/evaluation/`** — [fitness](src/f1_optimizer/core/evaluation/fitness.py) aggregation, [hard constraints](src/f1_optimizer/core/evaluation/hard_constraints.py), [soft constraints](src/f1_optimizer/core/evaluation/soft_constraints.py), and the precomputed [distance matrix](src/f1_optimizer/core/evaluation/distance_matrix.py)
+  - **`core/models.py`** — Pydantic domain models (`Track`, `Schedule`, configs)
 - **`data_access/`** — CSV loading and validation with Pydantic
 - **`cli/`** — Typer-based CLI with single-run, multi-config, and multi-run modes
 - **`visualize/`** — Seaborn fitness convergence plots
+
+The optimization problem (decision variables, hard/soft constraints, and the fitness function) is formally modeled for the 2026 F1 season in [constraints.md](constraints.md).
 
 ## Tech Stack
 
@@ -94,6 +99,32 @@ f1-optimizer optimize data/data.csv --config ga_config.toml --runs 5
 f1-optimizer optimize data/data.csv --config ga_config.toml --multi-config --runs 3
 ```
 
+### Recommended Workflow
+
+The GA has many tunable parameters and stochastic outcomes, so a two-stage approach works best:
+
+**Stage 1 — Broad exploration.** Run a wide multi-config sweep with many parameter permutations and a small number of runs per config (e.g. `--runs 5`). Use shorter generation counts to keep the sweep cheap. Inspect `summary.md` to identify the parameter regions that consistently produce good fitness.
+
+```bash
+f1-optimizer optimize data/data.csv \
+  --config ga_config.toml \
+  --multi-config \
+  --runs 2 \
+  --output results/sweep/
+```
+
+**Stage 2 — Focused refinement.** Narrow the config to the top-performing region from stage 1, then re-run with more repetitions and longer generations to reduce variance and let the GA converge.
+
+```bash
+f1-optimizer optimize data/data.csv \
+  --config ga_config_refined.toml \
+  --multi-config \
+  --runs 20 \
+  --output results/refined/
+```
+
+This avoids burning compute on parameter combinations that are unlikely to win, while still giving the final candidates enough runs to distinguish signal from noise.
+
 ### Generate Config Templates
 
 ```bash
@@ -126,6 +157,26 @@ results/
 └── summary.md        # All configs ranked by fitness
 ```
 
+## Data Overview
+
+The optimizer reads a single CSV ([data/data.csv](data/data.csv)) describing the 24 tracks of the **2026 F1 calendar** — this project was built specifically with the 2026 season in mind.
+
+| Column | Description |
+|--------|-------------|
+| `ID` | Unique track identifier (1–24) |
+| `City` | Host city |
+| `Country` | Host country |
+| `Track_Name` | Official circuit name |
+| `Region` | Geographic region (e.g. `Europe`, `Asia`, `Americas`, `Middle East`, `Oceania`) — used by the region-bounce and flyaway logistics penalties |
+| `Latitude` | Decimal degrees, used for Haversine distance |
+| `Longitude` | Decimal degrees, used for Haversine distance |
+| `UTC_Offset` | Standard timezone offset (hours), used for the jet-lag penalty |
+| `Temperatures` | List of 40 weekly mean temperatures (°C), one per season week |
+
+**Season window.** The 40-element `Temperatures` array maps to the season slots: index `0` is the **first week of March**, index `39` is the **first week of December**, covering 40 weeks total.
+
+**Temperature source.** Weekly means were computed from the [Open-Meteo](https://open-meteo.com/) historical weather API, averaged over the **last 5 years** at each track's coordinates. They feed both the hard weather constraint (HC3) and the environmental soft penalty ($Z_{env}$).
+
 ## Configuration
 
 ### Fitness Config (`fitness_config.toml`)
@@ -155,9 +206,8 @@ T_hard_max = 40.0
 T_opt_min = 18.0
 T_opt_max = 28.0
 
-L_max = 8000.0                  # max back-to-back distance (km)
 summer_break_window = [17, 26]  # 0-indexed week range
-ramadan_window = [6, 10]
+ramadan_window = [0, 3]
 ```
 
 ### GA Config (`ga_config.toml`)
@@ -175,11 +225,3 @@ tournament_size = 5
 stagnation_threshold = 50
 elite_size = 2
 ```
-
-## Development Roadmap
-
-- [x] Epic 1: Domain Models & Core Architecture
-- [x] Epic 2: Data Access & Pydantic Validation
-- [x] Epic 3: GA Operators (Fitness, Crossover, Mutation, Selection)
-- [x] Epic 4: Evolutionary Loop & CLI
-- [ ] Epic 5: Advanced Visualizations & Analytics

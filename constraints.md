@@ -75,15 +75,26 @@ For the Genetic Algorithm to evaluate invalid schedules, hard constraints are fo
   $$V_{ramadan} = \sum_{i \in V_{ME}} \sum_{t \in W_{ram}} x_{i,t}$$
 
 **Total Hard Constraint Violations ($V_{total}$):**
-$$V_{total} = V_{comp} + V_{cap} + V_{weather} + V_{freight} + V_{burnout} + V_{break} + V_{ramadan}$$
+$$V_{total} = V_{comp} + V_{cap} + V_{weather} + V_{burnout} + V_{break} + V_{ramadan}$$
 
 ---
 
 ## 5. Soft Constraints (SC) - Penalties to Minimize
 
 ### 5.1. Distance Penalty ($Z_{dist}$)
-Total physical distance traveled over the season:
+Total physical distance traveled over the season, summed over all 23 consecutive race-to-race legs:
 $$Z_{dist} = K_{dist} \cdot \sum_{k=1}^{23} D_{\omega_k, \omega_{k+1}}$$
+
+The pairwise distance $D_{i,j}$ between two tracks is the **great-circle distance in kilometers**, computed via the **Haversine formula** from each track's latitude and longitude. This approximates the Earth as a sphere and gives the shortest surface distance between two points — a reasonable proxy for freight/travel cost without modeling specific air or sea routes.
+
+Let $\varphi_i, \lambda_i$ denote the latitude and longitude (in radians) of track $i$, and let $R = 6371$ km be the mean radius of the Earth. Define the angular differences:
+$$\Delta\varphi = \varphi_j - \varphi_i \qquad \Delta\lambda = \lambda_j - \lambda_i$$
+
+The Haversine distance is then:
+$$a = \sin^2\!\left(\frac{\Delta\varphi}{2}\right) + \cos(\varphi_i) \cdot \cos(\varphi_j) \cdot \sin^2\!\left(\frac{\Delta\lambda}{2}\right)$$
+$$D_{i,j} = 2R \cdot \arcsin\!\left(\sqrt{a}\right)$$
+
+In the implementation, $D_{i,j}$ is precomputed once into a symmetric distance matrix at startup, so fitness evaluation during the GA loop is a constant-time lookup per leg.
 
 ### 5.2. Environmental Penalty ($Z_{env}$)
 Linear penalty for every degree outside the optimal window:
