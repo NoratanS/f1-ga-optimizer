@@ -6,7 +6,6 @@ from f1_optimizer.core.evaluation.hard_constraints import (
     count_completeness_violations,
     count_capacity_violations,
     count_weather_violations,
-    count_freight_violations,
     count_burnout_violations,
     count_break_violations,
     count_ramadan_violations,
@@ -75,35 +74,8 @@ class TestWeatherViolations:
         assert violations >= 0
 
 
-class TestFreightViolations:
-    """Tests for HC4: Freight Feasibility constraint."""
-
-    def test_no_violations_when_separated(self, distance_matrix, fitness_config):
-        """Test no violations when races are separated by breaks."""
-        # Arrange
-        chromosome = [1, 101, 2, 101, 3] + [101] * (distance_matrix.num_weeks - 5)
-
-        # Act
-        violations = count_freight_violations(chromosome, distance_matrix, fitness_config)
-
-        # Assert
-        assert violations == 0
-
-    def test_violations_are_non_negative(self, distance_matrix, fitness_config):
-        """Test freight violations are counted correctly."""
-        # Arrange
-        chromosome = [1, 2] + [101] * (distance_matrix.num_weeks - 2)
-
-        # Act
-        violations = count_freight_violations(chromosome, distance_matrix, fitness_config)
-
-        # Assert
-        assert isinstance(violations, int)
-        assert violations >= 0
-
-
 class TestBurnoutViolations:
-    """Tests for HC5: Burnout Prevention constraint (max 3 consecutive races)."""
+    """Tests for HC4: Burnout Prevention constraint (max 3 consecutive races)."""
 
     @pytest.mark.parametrize(
         "chromosome,expected_violations",
@@ -125,7 +97,7 @@ class TestBurnoutViolations:
 
 
 class TestBreakViolations:
-    """Tests for HC6: Summer Break Requirement."""
+    """Tests for HC5: Summer Break Requirement."""
 
     def test_no_violations_with_valid_break(self, fitness_config):
         """Test no violations when valid break exists in summer window."""
@@ -155,7 +127,7 @@ class TestBreakViolations:
 
 
 class TestRamadanViolations:
-    """Tests for HC7: Ramadan Observance constraint."""
+    """Tests for HC6: Ramadan Observance constraint."""
 
     def test_no_violations_no_middle_east_races(self, fitness_config):
         """Test no violations when no Middle East races scheduled."""
@@ -216,12 +188,11 @@ class TestEvaluateHardConstraints:
         assert hasattr(violations, "completeness")
         assert hasattr(violations, "capacity")
         assert hasattr(violations, "weather")
-        assert hasattr(violations, "freight")
         assert hasattr(violations, "burnout")
         assert hasattr(violations, "break_requirement")
         assert hasattr(violations, "ramadan")
         # All should be non-negative integers
         assert all(isinstance(getattr(violations, attr), int) for attr in
-                   ["completeness", "capacity", "weather", "freight", "burnout", "break_requirement", "ramadan"])
+                   ["completeness", "capacity", "weather", "burnout", "break_requirement", "ramadan"])
         assert all(getattr(violations, attr) >= 0 for attr in
-                   ["completeness", "capacity", "weather", "freight", "burnout", "break_requirement", "ramadan"])
+                   ["completeness", "capacity", "weather", "burnout", "break_requirement", "ramadan"])

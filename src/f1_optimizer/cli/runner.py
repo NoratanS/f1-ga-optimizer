@@ -30,7 +30,7 @@ def run_single_config(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     write_config_toml(ga_config, output_dir / "config.toml")
-    write_schedule_md(best_report, tracks, ga_config, fitness_evaluator.config, output_dir / "schedule.md")
+    write_schedule_md(best_report, tracks, ga_config, fitness_evaluator, output_dir / "schedule.md")
     plot_fitness_curve(best_report, output_dir / "plot.png")
     return best_report
 

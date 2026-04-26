@@ -8,16 +8,15 @@ K_bounce = 10000.0
 K_flyaway = 50000.0
 M = 1000000.0
 
-w_dist = 0.25
-w_env = 0.25
-w_log = 0.25
-w_hum = 0.25
+w_dist = 0.5
+w_env = 0.2
+w_log = 0.2
+w_hum = 0.1
 
 T_hard_min = 5.0
 T_hard_max = 40.0
 T_opt_min = 18.0
 T_opt_max = 28.0
 
-L_max = 8000.0
 summer_break_window = [17, 26]
 ramadan_window = [0, 3]

@@ -29,7 +29,6 @@ Let the valid schedule be represented as an ordered sequence of races:
 * $V_{ME}$ : Subset of tracks located in the Middle East ($V_{ME} \subset V$).
 
 ### 3.2. Constraints & Thresholds
-* $L_{max}$ : Max flight distance for back-to-back races (e.g., 8,000 km).
 * $[T^{min}_{hard}, T^{max}_{hard}]$ : Critical weather limits (5°C, 40°C).
 * $[T^{min}_{opt}, T^{max}_{opt}]$ : Optimal weather window (18°C, 28°C).
 
@@ -63,19 +62,15 @@ For the Genetic Algorithm to evaluate invalid schedules, hard constraints are fo
   Counts scheduled races falling outside the hard temperature limits.
   $$V_{weather} = \sum_{t=1}^{40} \sum_{i=1}^{24} x_{i,t} \cdot \mathbb{I}(T_{i,t} < T^{min}_{hard} \text{ or } T_{i,t} > T^{max}_{hard})$$
 
-* **[HC4] Freight Feasibility ($V_{freight}$):**
-  Counts back-to-back sequences that exceed the maximum permissible flight distance.
-  $$V_{freight} = \sum_{k=1}^{23} \mathbb{I}(\tau_{k+1} - \tau_k = 1 \text{ and } D_{\omega_k, \omega_{k+1}} > L_{max})$$
-
-* **[HC5] Burnout Prevention ($V_{burnout}$):**
+* **[HC4] Burnout Prevention ($V_{burnout}$):**
   Counts instances of 4 or more consecutive race weeks.
   $$V_{burnout} = \sum_{t=1}^{37} \max(0, y_t + y_{t+1} + y_{t+2} + y_{t+3} - 3)$$
 
-* **[HC6] Summer Break Requirement ($V_{break}$):**
+* **[HC5] Summer Break Requirement ($V_{break}$):**
   Returns 1 if there is no consecutive 3-week gap within the summer window $S$, 0 otherwise.
   $$V_{break} = 1 - \max_{t \in S} \Big( \mathbb{I}(y_t + y_{t+1} + y_{t+2} = 0) \Big)$$
 
-* **[HC7] Ramadan Observance ($V_{ramadan}$):**
+* **[HC6] Ramadan Observance ($V_{ramadan}$):**
   Counts Middle Eastern races placed during the Ramadan period.
   $$V_{ramadan} = \sum_{i \in V_{ME}} \sum_{t \in W_{ram}} x_{i,t}$$
 

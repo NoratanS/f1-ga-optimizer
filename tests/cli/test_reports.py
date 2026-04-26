@@ -43,32 +43,32 @@ class TestWriteConfigToml:
 class TestWriteScheduleMd:
     """Tests for write_schedule_md."""
 
-    def test_creates_file(self, tmp_path, sample_ga_report, track_db, fitness_config):
+    def test_creates_file(self, tmp_path, sample_ga_report, track_db, fitness_evaluator):
         # Act
-        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_config, tmp_path / "schedule.md")
+        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_evaluator, tmp_path / "schedule.md")
 
         # Assert
         assert (tmp_path / "schedule.md").exists()
 
-    def test_contains_total_fitness_score(self, tmp_path, sample_ga_report, track_db, fitness_config):
+    def test_contains_total_fitness_score(self, tmp_path, sample_ga_report, track_db, fitness_evaluator):
         # Act
-        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_config, tmp_path / "schedule.md")
+        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_evaluator, tmp_path / "schedule.md")
 
         # Assert
         content = (tmp_path / "schedule.md").read_text()
         assert "50,000.00" in content
 
-    def test_contains_total_distance_in_km(self, tmp_path, sample_ga_report, track_db, fitness_config):
+    def test_contains_total_distance_in_km(self, tmp_path, sample_ga_report, track_db, fitness_evaluator):
         # Act
-        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_config, tmp_path / "schedule.md")
+        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_evaluator, tmp_path / "schedule.md")
 
         # Assert
         content = (tmp_path / "schedule.md").read_text()
         assert "50,000 km" in content
 
-    def test_contains_race_schedule_section_with_rows(self, tmp_path, sample_ga_report, track_db, fitness_config):
+    def test_contains_race_schedule_section_with_rows(self, tmp_path, sample_ga_report, track_db, fitness_evaluator):
         # Act
-        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_config, tmp_path / "schedule.md")
+        write_schedule_md(sample_ga_report, track_db, GAConfig(), fitness_evaluator, tmp_path / "schedule.md")
 
         # Assert
         content = (tmp_path / "schedule.md").read_text()
