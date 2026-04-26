@@ -50,11 +50,11 @@ class GAConfig(BaseModel):
 @dataclass
 class GAReport:
     """Report from GA execution."""
-    
+
     best_fitness: float
     best_individual: Individual
-    avg_fitness_per_gen: list[float]
     best_fitness_per_gen: list[float]
+    best_breakdown_per_gen: list[FitnessBreakdown]
     generations_run: int
     fitness_breakdown: Optional[FitnessBreakdown] = None
     
@@ -133,10 +133,12 @@ class GeneticAlgorithm:
         best_individual = population[0].clone()
         best_fitness = population[0].fitness
         generations_without_improvement = 0
-        
-        # History tracking
+
+        # History tracking. Breakdown is recomputed only when the best individual
+        # changes; otherwise we reuse the cached value to avoid redundant work.
+        best_breakdown = self.fitness_evaluator.get_fitness_breakdown(best_individual)
         best_fitness_per_gen = [best_fitness]
-        avg_fitness_per_gen = [sum(ind.fitness for ind in population) / len(population)]
+        best_breakdown_per_gen = [best_breakdown]
         
         # Select operators based on config
         crossover_fn = crossover_ox1 if self.config.crossover_type == "ox1" else crossover_pmx
@@ -191,22 +193,20 @@ class GeneticAlgorithm:
             if population[0].fitness < best_fitness:
                 best_individual = population[0].clone()
                 best_fitness = population[0].fitness
+                best_breakdown = self.fitness_evaluator.get_fitness_breakdown(best_individual)
                 generations_without_improvement = 0
             else:
                 generations_without_improvement += 1
-            
+
             # History
             best_fitness_per_gen.append(best_fitness)
-            avg_fitness_per_gen.append(sum(ind.fitness for ind in population) / len(population))
-        
-        # Calculate fitness breakdown for the best individual
-        fitness_breakdown = self.fitness_evaluator.get_fitness_breakdown(best_individual)
-        
+            best_breakdown_per_gen.append(best_breakdown)
+
         return GAReport(
             best_fitness=best_fitness,
             best_individual=best_individual,
             best_fitness_per_gen=best_fitness_per_gen,
-            avg_fitness_per_gen=avg_fitness_per_gen,
+            best_breakdown_per_gen=best_breakdown_per_gen,
             generations_run=generation,
-            fitness_breakdown=fitness_breakdown,
+            fitness_breakdown=best_breakdown,
         )

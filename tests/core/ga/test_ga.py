@@ -6,7 +6,20 @@ from f1_optimizer.core.ga.ga import (
     initialize_population,
     GeneticAlgorithm,
 )
+from f1_optimizer.core.evaluation.fitness import FitnessBreakdown
 from f1_optimizer.core.models import Individual
+
+
+def _make_breakdown(total: float = 0.0) -> FitnessBreakdown:
+    return FitnessBreakdown(
+        total_fitness=total,
+        distance_penalty=0.0,
+        environment_penalty=0.0,
+        jetlag_penalty=0.0,
+        headers_penalty=0.0,
+        logistics_penalty=0.0,
+        hard_violations_penalty=0.0,
+    )
 
 
 class TestGAConfig:
@@ -112,25 +125,27 @@ class TestGAReport:
     def test_report_creation(self):
         """Should create report with all fields."""
         ind = Individual([1, 2, 3], fitness=5.0)
+        bd = _make_breakdown(5.0)
         report = GAReport(
             best_fitness=5.0,
             best_individual=ind,
-            avg_fitness_per_gen=[10.0, 8.0, 5.0],
             best_fitness_per_gen=[10.0, 8.0, 5.0],
+            best_breakdown_per_gen=[bd, bd, bd],
             generations_run=3,
         )
         assert report.best_fitness == 5.0
         assert report.generations_run == 3
-        assert len(report.avg_fitness_per_gen) == 3
+        assert len(report.best_breakdown_per_gen) == 3
 
     def test_report_summary(self):
         """Summary should be human-readable."""
         ind = Individual([1, 2, 3], fitness=5.0)
+        bd = _make_breakdown(5.0)
         report = GAReport(
             best_fitness=5.0,
             best_individual=ind,
-            avg_fitness_per_gen=[10.0, 5.0],
             best_fitness_per_gen=[10.0, 5.0],
+            best_breakdown_per_gen=[bd, bd],
             generations_run=2,
         )
         summary = report.summary()
@@ -220,7 +235,7 @@ class TestGeneticAlgorithm:
         report = ga.evolve()
         
         assert len(report.best_fitness_per_gen) == report.generations_run + 1
-        assert len(report.avg_fitness_per_gen) == report.generations_run + 1
+        assert len(report.best_breakdown_per_gen) == report.generations_run + 1
 
     def test_best_individual_improves_or_stays_same(self, fitness_evaluator):
         """Best fitness should monotonically decrease (lower is better)."""
@@ -393,7 +408,7 @@ class TestGeneticAlgorithm:
         # History should have initial + evolutionary generations
         # If we run N generations, history has N+1 entries (initial + N evolutionary)
         assert len(report.best_fitness_per_gen) == report.generations_run + 1
-        assert len(report.avg_fitness_per_gen) == report.generations_run + 1
+        assert len(report.best_breakdown_per_gen) == report.generations_run + 1
         # Should stop well before generation 100 due to early stopping
         assert report.generations_run < 100
         # generations_run must be positive

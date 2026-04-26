@@ -38,8 +38,8 @@ def sample_ga_report(track_db):
     return GAReport(
         best_fitness=50000.0,
         best_individual=individual,
-        avg_fitness_per_gen=[60000.0, 55000.0, 50000.0],
         best_fitness_per_gen=[60000.0, 55000.0, 50000.0],
+        best_breakdown_per_gen=[breakdown, breakdown, breakdown],
         generations_run=2,
         fitness_breakdown=breakdown,
     )
